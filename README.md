@@ -1,5 +1,9 @@
 <div align="center">
-<img width="1200" height="475" alt="Clan Dei Nudi App Banner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+<img width="1918" height="1117" alt="Screenshot_20260529_195731" src="https://github.com/user-attachments/assets/3bbd6874-68ef-4737-9869-135d7901a128" />
+<img width="377" height="852" alt="Screenshot_20260606_080354" src="https://github.com/user-attachments/assets/d3345010-c5fe-406c-af8b-d81536e241f3" />
+<img width="374" height="853" alt="Screenshot_20260606_080528" src="https://github.com/user-attachments/assets/f719bd95-fa12-43b3-ac55-abf3c409dfa5" />
+<img width="377" height="839" alt="Screenshot_20260606_080555" src="https://github.com/user-attachments/assets/6db86954-0464-4868-bf91-06f22c22b14a" />
+
 
 # 🎭 Clan Dei Nudi App
 **L'app ufficiale del Clan Dei Nudi**
