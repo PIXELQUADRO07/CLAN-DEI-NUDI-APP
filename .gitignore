@@ -1,0 +1,52 @@
+# Android build artifacts
+/build
+/*/build
+*.apk
+*.aar
+*.ap_
+*.dex
+
+# IDE - Android Studio / IntelliJ
+.idea/
+*.iml
+.idea/modules.xml
+.idea/workspace.xml
+.idea/libraries
+.idea/caches
+.idea/assetWizardSettings.xml
+.idea/navEditor.xml
+.idea/deploymentTargetSelector.xml
+*.iws
+*.ipr
+/captures
+
+# Gradle
+.gradle/
+build/
+local.properties
+.externalNativeBuild
+.cxx
+gradle-app.setting
+.navigation/
+
+# Secrets & Keys (CRITICAL for Clan Security)
+.env
+.env.example
+*.jks
+*.keystore
+*.p12
+*.key
+google-services.json
+app/google-services.json
+
+# OS related
+.DS_Store
+Thumbs.db
+*.swp
+*~
+executable.sh
+
+# Kotlin / Java
+*.class
+/out/
+.kotlin/

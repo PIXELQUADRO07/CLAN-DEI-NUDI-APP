@@ -1,0 +1,6 @@
+{
+  "name": "CLAN DEI NUDI APP",
+  "description": "Un clone di Instagram in stile cyberpunk rosso e nero, completo di feed, sondaggi, chat criptate, radar membri, backup crittografati, autenticazione biometrica e aggiornamenti GitHub.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
