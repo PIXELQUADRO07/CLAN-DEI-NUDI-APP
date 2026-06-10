@@ -2,8 +2,53 @@ package com.example.CDN.security
 
 import android.util.Base64
 import java.nio.charset.StandardCharsets
+import javax.crypto.Cipher
+import javax.crypto.spec.SecretKeySpec
+import java.security.MessageDigest
 
 object SecurityUtils {
+
+    /**
+     * Genera una chiave AES a 256 bit a partire da una stringa.
+     */
+    private fun generateKey(password: String): SecretKeySpec {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes = password.toByteArray(StandardCharsets.UTF_8)
+        digest.update(bytes, 0, bytes.size)
+        val key = digest.digest()
+        return SecretKeySpec(key, "AES")
+    }
+
+    /**
+     * Cifra una stringa usando AES-256 con una password fornita.
+     */
+    fun encryptAES(text: String, password: String): String {
+        return try {
+            val secretKey = generateKey(password)
+            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+            val encryptedBytes = cipher.doFinal(text.toByteArray(StandardCharsets.UTF_8))
+            Base64.encodeToString(encryptedBytes, Base64.DEFAULT).trim()
+        } catch (e: Exception) {
+            "ERR_CRYPT"
+        }
+    }
+
+    /**
+     * Decifra una stringa base64 AES-256 con una password fornita.
+     */
+    fun decryptAES(encryptedBase64: String, password: String): String {
+        return try {
+            val secretKey = generateKey(password)
+            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, secretKey)
+            val decodedBytes = Base64.decode(encryptedBase64, Base64.DEFAULT)
+            val decryptedString = String(cipher.doFinal(decodedBytes), StandardCharsets.UTF_8)
+            decryptedString
+        } catch (e: Exception) {
+            "/// DATI CORROTTI O CHIAVE ERRATA ///"
+        }
+    }
 
     // Simple reversible XOR encryption using a dynamic key for the Clan E2E simulation.
     // This turns plain message strings into encrypted Base64 and shows hexadecimal decrypt dumps in UI.

@@ -38,6 +38,7 @@ fun AuthScreen(
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var tacticalPin by remember { mutableStateOf("") }
     var actionError by remember { mutableStateOf("") }
 
     Box(
@@ -125,6 +126,18 @@ fun AuthScreen(
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyberRed, unfocusedBorderColor = CyberGray, focusedTextColor = CyberWhite)
                 )
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Tactical PIN 2FA
+                OutlinedTextField(
+                    value = tacticalPin,
+                    onValueChange = { tacticalPin = it.filter { char -> char.isDigit() }.take(6) },
+                    modifier = Modifier.fillMaxWidth().testTag("pin_auth_input"),
+                    visualTransformation = PasswordVisualTransformation(),
+                    label = { Text("PIN TATTICO (2FA)", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = CyberWhite.copy(alpha = 0.5f)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyberYellow, unfocusedBorderColor = CyberGray, focusedTextColor = CyberYellow)
+                )
+
                 Spacer(modifier = Modifier.height(18.dp))
 
                 if (actionError.isNotEmpty()) {
@@ -142,10 +155,15 @@ fun AuthScreen(
                     text = if (isLoginMode) "ACCEDI AL CANALE" else "REGISTRA ACCOUNT COGNITIVO",
                     onClick = {
                         actionError = ""
+                        if (tacticalPin.length != 6) {
+                            actionError = "IL PIN TATTICO DEVE ESSERE DI 6 CIFRE"
+                            return@CyberButton
+                        }
                         if (isLoginMode) {
                             viewModel.attemptLoginCredentials(
                                 mail = email,
                                 pass = password,
+                                pin = tacticalPin,
                                 onSuccess = { onAuthSuccess() },
                                 onError = { actionError = it }
                             )
@@ -154,6 +172,7 @@ fun AuthScreen(
                                 user = username,
                                 mail = email,
                                 pass = password,
+                                pin = tacticalPin,
                                 onSuccess = { onAuthSuccess() },
                                 onError = { actionError = it }
                             )

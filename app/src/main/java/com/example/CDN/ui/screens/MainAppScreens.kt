@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,11 +61,50 @@ fun FeedScreen(
     var pollQuestionText by remember { mutableStateOf("") }
     var pollOption1 by remember { mutableStateOf("") }
     var pollOption2 by remember { mutableStateOf("") }
+    
+    // Ghost protocol state
+    var isGhostPost by remember { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+    val activeChannel by viewModel.activeChannel.collectAsState()
+    val channels = listOf("generale", "operazioni", "intelligence", "sicurezza")
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScrollableTabRow(
+            selectedTabIndex = channels.indexOf(activeChannel).coerceAtLeast(0),
+            containerColor = CyberBlack,
+            contentColor = CyberRed,
+            edgePadding = 8.dp,
+            indicator = { tabPositions ->
+                if (channels.indexOf(activeChannel) >= 0) {
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[channels.indexOf(activeChannel)]),
+                        color = CyberRed
+                    )
+                }
+            }
+        ) {
+            channels.forEach { channel ->
+                val isSelected = activeChannel == channel
+                Tab(
+                    selected = isSelected,
+                    onClick = { viewModel.changeActiveChannel(channel) },
+                    text = { 
+                        Text(
+                            text = "#${channel.uppercase()}", 
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) CyberRed else CyberWhite.copy(alpha = 0.5f)
+                        ) 
+                    }
+                )
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         item {
             // Creative Collapsible Editor Form for new post creation
             CyberCard(
@@ -109,6 +149,24 @@ fun FeedScreen(
                             fontSize = 11.sp,
                             color = CyberWhite,
                             modifier = Modifier.clickable { isPollPost = !isPollPost }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isGhostPost,
+                            onCheckedChange = { isGhostPost = it },
+                            colors = CheckboxDefaults.colors(checkedColor = CyberYellow, uncheckedColor = CyberGray)
+                        )
+                        Text(
+                            text = "PROTOCOLLO GHOST (SCADE IN 1 ORA)",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = CyberYellow,
+                            modifier = Modifier.clickable { isGhostPost = !isGhostPost }
                         )
                     }
 
@@ -158,11 +216,13 @@ fun FeedScreen(
                                         text = newPostText,
                                         isPoll = isPollPost && options.isNotEmpty(),
                                         pollQuestion = pollQuestionText,
-                                        pollOptionsList = options
+                                        pollOptionsList = options,
+                                        isGhost = isGhostPost
                                     )
                                     // Reset fields
                                     newPostText = ""
                                     isPollPost = false
+                                    isGhostPost = false
                                     pollQuestionText = ""
                                     pollOption1 = ""
                                     pollOption2 = ""
@@ -208,9 +268,9 @@ fun FeedScreen(
                 val timestampStr = format.format(Date(post.timestamp))
 
                 CyberCard(
-                    borderColor = if (post.isPoll) CyberYellow else CyberRed,
-                    titleSpec = "POST DA: @${post.author}",
-                    terminalBadge = if (post.isPoll) "SONDAGGIO_CLAN" else "FEED_DATA"
+                    borderColor = if (post.isPoll) CyberYellow else if (post.isGhost) CyberRed else CyberRed,
+                    titleSpec = "POST DA: @${post.author}" + if (post.isGhost) " [GHOST]" else "",
+                    terminalBadge = if (post.isPoll) "SONDAGGIO_CLAN" else if (post.isGhost) "GHOST_DATA" else "FEED_DATA"
                 ) {
                     Text(
                         text = post.content,
@@ -574,9 +634,10 @@ fun EncryptedChatScreen(
     var rawText by remember { mutableStateOf("") }
     var cryptoKeyInput by remember { mutableStateOf("CLAN_CRYPT_99") } // Default Key
     var viewDecryptedMsg by remember { mutableStateOf(true) }
+    var isGhostMsg by remember { mutableStateOf(false) }
 
-    // Use current chat list or empty
-    val members = emptyList<String>() 
+    // Use current radar list as chat recipients
+    val members = viewModel.radarMembers.map { it.username }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(14.dp)
@@ -687,7 +748,7 @@ fun EncryptedChatScreen(
                 ) {
                     items(messages) { message ->
                         val isMe = message.sender == currentUser?.username
-                        val decrypted = SecurityUtils.decrypt(message.encryptedBody, cryptoKeyInput)
+                        val decrypted = com.example.CDN.utils.SecurityUtils.decryptAES(message.encryptedBody, cryptoKeyInput)
 
                         val displayColor = if (isMe) CyberRed else CyberGray
                         val alignSide = if (isMe) Alignment.End else Alignment.Start
@@ -715,8 +776,8 @@ fun EncryptedChatScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = if (isMe) "TU [XOR]" else "@${message.sender} [XOR]",
-                                            color = if (isMe) CyberRed else CyberYellow,
+                                            text = (if (isMe) "TU [XOR]" else "@${message.sender} [XOR]") + if (message.isGhost) " [GHOST]" else "",
+                                            color = if (message.isGhost) CyberRed else if (isMe) CyberRed else CyberYellow,
                                             fontSize = 9.sp,
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold
@@ -770,24 +831,44 @@ fun EncryptedChatScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         // Message input console
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = rawText,
-                onValueChange = { rawText = it },
-                modifier = Modifier.weight(1.5f).testTag("chat_input_field"),
-                placeholder = { Text("Messaggio sicuro...", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = CyberWhite.copy(alpha = 0.4f)) },
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyberRed, unfocusedBorderColor = CyberGray, focusedTextColor = CyberWhite)
-            )
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = isGhostMsg,
+                    onCheckedChange = { isGhostMsg = it },
+                    colors = CheckboxDefaults.colors(checkedColor = CyberYellow, uncheckedColor = CyberGray)
+                )
+                Text(
+                    text = "PROTOCOLLO GHOST",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    color = CyberYellow,
+                    modifier = Modifier.clickable { isGhostMsg = !isGhostMsg }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = rawText,
+                    onValueChange = { rawText = it },
+                    modifier = Modifier.weight(1.5f).testTag("chat_input_field"),
+                    placeholder = { Text("Messaggio sicuro...", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = CyberWhite.copy(alpha = 0.4f)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyberRed, unfocusedBorderColor = CyberGray, focusedTextColor = CyberWhite)
+                )
 
-            IconButton(
-                onClick = {
-                    if (rawText.isNotBlank()) {
-                        viewModel.sendEncryptedMessage(rawText, cryptoKeyInput)
-                        rawText = ""
+                IconButton(
+                    onClick = {
+                        if (rawText.isNotBlank()) {
+                            viewModel.sendEncryptedMessage(rawText, cryptoKeyInput, isGhostMsg)
+                            rawText = ""
+                        }
+                    },
                     }
                 },
                 modifier = Modifier
@@ -905,11 +986,18 @@ fun ProfileScreen(
     currentUser: UserEntity?
 ) {
     var editBioText by remember { mutableStateOf("") }
+    var editPinText by remember { mutableStateOf("") }
     var isEditingBio by remember { mutableStateOf(false) }
+    
+    val adminUsers by viewModel.adminUsersList.collectAsState()
 
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             editBioText = currentUser.bio
+            editPinText = currentUser.tacticalPin
+            if (currentUser.role == "ADMIN") {
+                viewModel.fetchAdminUserList()
+            }
         }
     }
 
@@ -1029,7 +1117,7 @@ fun ProfileScreen(
             // Bio Section with interactive Console Editor
             CyberCard(
                 borderColor = CyberRed,
-                titleSpec = "BIO STRUTTURALI UTENTE",
+                titleSpec = "BIO STRUTTURALI & PIN",
                 terminalBadge = "BIO_TERMINAL"
             ) {
                 if (isEditingBio) {
@@ -1037,15 +1125,26 @@ fun ProfileScreen(
                         value = editBioText,
                         onValueChange = { editBioText = it },
                         modifier = Modifier.fillMaxWidth().testTag("bio_input_field"),
+                        label = { Text("BIO OPERATIVA", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = CyberWhite.copy(alpha = 0.5f)) },
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyberRed, unfocusedBorderColor = CyberGray, focusedTextColor = CyberWhite)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = editPinText,
+                        onValueChange = { editPinText = it.filter { c -> c.isDigit() }.take(6) },
+                        modifier = Modifier.fillMaxWidth().testTag("pin_input_field"),
+                        label = { Text("NUOVO PIN TATTICO (6 CIFRE)", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = CyberYellow) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyberYellow, unfocusedBorderColor = CyberGray, focusedTextColor = CyberYellow)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CyberButton(
                             text = "Salva",
                             onClick = {
-                                viewModel.editProfileBio(editBioText)
-                                isEditingBio = false
+                                if (editPinText.length == 6) {
+                                    viewModel.updateUserProfile(editBioText, editPinText)
+                                    isEditingBio = false
+                                }
                             },
                             modifier = Modifier.weight(1f),
                             testTag = "save_bio_btn"
@@ -1067,11 +1166,65 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     CyberButton(
-                        text = "Aggiorna Bio Terminale",
+                        text = "Aggiorna Profilo e PIN",
                         onClick = { isEditingBio = true },
                         modifier = Modifier.fillMaxWidth(),
                         testTag = "edit_bio_btn"
                     )
+                }
+            }
+        }
+
+        if (currentUser?.role == "ADMIN") {
+            item {
+                CyberCard(
+                    borderColor = CyberYellow,
+                    titleSpec = "PANNELLO ADMIN / CLAN ROOT",
+                    terminalBadge = "ROOT_ACCESS"
+                ) {
+                    Text(
+                        text = "GESTIONE AGENTI OPERATIVI",
+                        color = CyberWhite,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        adminUsers.forEach { user ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().border(1.dp, CyberGray, RoundedCornerShape(4.dp)).padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(text = "@${user.username}", color = CyberRed, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                    Text(text = "RUOLO: ${user.role}", color = CyberWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (user.role != "ADMIN") {
+                                        Text(
+                                            text = "[PROMUOVI]",
+                                            color = CyberYellow,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.clickable { viewModel.adminChangeUserRole(user.username, "ADMIN") }
+                                        )
+                                    }
+                                    if (user.role != "SILENTE") {
+                                        Text(
+                                            text = "[SILENZIA]",
+                                            color = CyberWhite.copy(alpha = 0.5f),
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.clickable { viewModel.adminChangeUserRole(user.username, "SILENTE") }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

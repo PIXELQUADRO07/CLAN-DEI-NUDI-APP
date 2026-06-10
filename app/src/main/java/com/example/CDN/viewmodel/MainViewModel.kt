@@ -62,6 +62,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentScreen = MutableStateFlow("splash") 
     val currentScreen: StateFlow<String> = _currentScreen.asStateFlow()
 
+    private val _activeChannel = MutableStateFlow("generale")
+    val activeChannel: StateFlow<String> = _activeChannel.asStateFlow()
+
+    private val _adminUsersList = MutableStateFlow<List<UserEntity>>(emptyList())
+    val adminUsersList: StateFlow<List<UserEntity>> = _adminUsersList.asStateFlow()
+
     // Logged in User State
     private val _currentUser = MutableStateFlow<UserEntity?>(null)
     val currentUser: StateFlow<UserEntity?> = _currentUser.asStateFlow()
@@ -270,29 +276,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun generateDynamicRadarMembers() {
-        radarMembers.clear()
-        val random = Random(System.currentTimeMillis())
-        val statuses = listOf("OPERATIVO", "SILENTE", "INCURSIONE")
-        val bios = listOf(
-            "Nodo di coordinamento crittografico.",
-            "Spettro di rete. Crittografia stealth.",
-            "In esplorazione attiva. Monitora anomalie.",
-            "Sviluppatore di interfacce cybernetiche.",
-            "Assistenza richiesta immediata!",
-            "Scollegato temporaneamente."
-        )
-        val names = listOf("admin_clan", "cyber_ghost", "nude_scout_02", "matrix_lady", "neon_rebel", "dark_void_0")
-        
-        for (i in names.indices) {
-            radarMembers.add(RadarMember(
-                id = (i + 1).toString(),
-                username = names[i],
-                distanceMeters = random.nextInt(100, 4000),
-                bearingDegrees = random.nextFloat() * 360f,
-                activeStatus = statuses.random(random),
-                distressLevel = random.nextInt(0, 100),
-                bio = bios[i]
-            ))
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("users").get().await()
+                val activeUsers = snapshot.documents.mapNotNull { it.getString("username") }
+                
+                val currentList = mutableListOf<RadarMember>()
+                val random = Random(System.currentTimeMillis())
+                val statuses = listOf("OPERATIVO", "SILENTE", "INCURSIONE")
+                
+                for (i in activeUsers.indices) {
+                    val uname = activeUsers[i]
+                    if (uname == _currentUser.value?.username) continue
+                    
+                    currentList.add(RadarMember(
+                        id = (i + 1).toString(),
+                        username = uname,
+                        distanceMeters = random.nextInt(100, 4000), // Simulated distance for privacy
+                        bearingDegrees = random.nextFloat() * 360f,
+                        activeStatus = statuses.random(random),
+                        distressLevel = random.nextInt(0, 100),
+                        bio = "Connessione stabilita."
+                    ))
+                }
+                radarMembers.clear()
+                radarMembers.addAll(currentList)
+            } catch (e: Exception) {
+                _activeFirebaseStatusLog.value = "RADAR SYNC FAILED"
+            }
         }
     }
 
@@ -320,7 +331,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     email = doc.getString("email") ?: "",
                     bio = doc.getString("bio") ?: "",
                     followersCount = doc.getLong("followersCount")?.toInt() ?: 0,
-                    followingCount = doc.getLong("followingCount")?.toInt() ?: 0
+                    followingCount = doc.getLong("followingCount")?.toInt() ?: 0,
+                    role = doc.getString("role") ?: "OPERATIVO",
+                    tacticalPin = doc.getString("tacticalPin") ?: ""
                 )
                 clanDao.insertUser(user)
                 _currentUser.value = user
@@ -336,9 +349,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         setupFirestoreMessagesListener()
     }
 
+    fun changeActiveChannel(channel: String) {
+        _activeChannel.value = channel
+        setupFirestorePostsListener()
+    }
+
     private fun setupFirestorePostsListener() {
         postsListener?.remove()
         postsListener = firestore.collection("posts")
+            .whereEqualTo("channel", _activeChannel.value)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
@@ -346,20 +365,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val posts = snapshot.documents.map { doc ->
-                        PostEntity(
-                            id = doc.id.hashCode(),
-                            author = doc.getString("author") ?: "anon",
-                            content = doc.getString("content") ?: "",
-                            timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
-                            likesCount = doc.getLong("likesCount")?.toInt() ?: 0,
-                            sharesCount = doc.getLong("sharesCount")?.toInt() ?: 0,
-                            likedByUsers = doc.getString("likedByUsers") ?: "",
-                            isPoll = doc.getBoolean("isPoll") ?: false,
-                            pollQuestion = doc.getString("pollQuestion") ?: "",
-                            pollOptions = doc.getString("pollOptions") ?: "",
-                            pollVotes = doc.getString("pollVotes") ?: ""
-                        )
+                    val posts = snapshot.documents.mapNotNull { doc ->
+                        val isGhost = doc.getBoolean("isGhost") ?: false
+                        val expiresAt = doc.getLong("expiresAt") ?: 0L
+                        val currentTime = System.currentTimeMillis()
+                        
+                        if (isGhost && currentTime > expiresAt) {
+                            doc.reference.delete()
+                            null
+                        } else {
+                            PostEntity(
+                                id = doc.id.hashCode(),
+                                author = doc.getString("author") ?: "anon",
+                                content = doc.getString("content") ?: "",
+                                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                                likesCount = doc.getLong("likesCount")?.toInt() ?: 0,
+                                sharesCount = doc.getLong("sharesCount")?.toInt() ?: 0,
+                                likedByUsers = doc.getString("likedByUsers") ?: "",
+                                isPoll = doc.getBoolean("isPoll") ?: false,
+                                pollQuestion = doc.getString("pollQuestion") ?: "",
+                                pollOptions = doc.getString("pollOptions") ?: "",
+                                pollVotes = doc.getString("pollVotes") ?: "",
+                                channel = doc.getString("channel") ?: "generale",
+                                isGhost = isGhost,
+                                expiresAt = expiresAt
+                            )
+                        }
                     }
                     _firestorePosts.value = posts
                 }
@@ -379,6 +410,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val msgs = snapshot.documents.mapNotNull { doc ->
                         val mSender = doc.getString("sender") ?: ""
                         val mReceiver = doc.getString("receiver") ?: ""
+                        val isGhost = doc.getBoolean("isGhost") ?: false
+                        val expiresAt = doc.getLong("expiresAt") ?: 0L
+                        val currentTime = System.currentTimeMillis()
+                        
+                        if (isGhost && currentTime > expiresAt) {
+                            doc.reference.delete()
+                            return@mapNotNull null
+                        }
+
                         if ((mSender == currentUser && mReceiver == receiver) || 
                             (mSender == receiver && mReceiver == currentUser)) {
                             MessageEntity(
@@ -387,7 +427,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 receiver = mReceiver,
                                 encryptedBody = doc.getString("encryptedBody") ?: "",
                                 originalDecryptKey = doc.getString("originalDecryptKey") ?: "",
-                                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                                isGhost = isGhost,
+                                expiresAt = expiresAt
                             )
                         } else null
                     }
@@ -396,7 +438,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
     }
 
-    fun sendEncryptedMessage(text: String, cryptoKey: String) {
+    fun sendEncryptedMessage(text: String, cryptoKey: String, isGhost: Boolean = false) {
         if (text.isBlank()) return
         viewModelScope.launch {
             val senderUsername = _currentUser.value?.username ?: "anon_clan"
@@ -406,9 +448,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 "idCode" to msgId,
                 "sender" to senderUsername,
                 "receiver" to receiverUsername,
-                "encryptedBody" to SecurityUtils.encrypt(text, cryptoKey),
+                "encryptedBody" to SecurityUtils.encryptAES(text, cryptoKey),
                 "originalDecryptKey" to cryptoKey,
-                "timestamp" to System.currentTimeMillis()
+                "timestamp" to System.currentTimeMillis(),
+                "isGhost" to isGhost,
+                "expiresAt" to if (isGhost) System.currentTimeMillis() + 3600000L else 0L
             )
             try {
                 firestore.collection("messages").add(messageMap).await()
@@ -416,7 +460,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createNewPost(text: String, isPoll: Boolean = false, pollQuestion: String = "", pollOptionsList: List<String> = emptyList()) {
+    fun createNewPost(text: String, isPoll: Boolean = false, pollQuestion: String = "", pollOptionsList: List<String> = emptyList(), isGhost: Boolean = false) {
         viewModelScope.launch {
             val authorName = _currentUser.value?.username ?: "anon_clan"
             val postMap = hashMapOf(
@@ -428,7 +472,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 "isPoll" to isPoll,
                 "pollQuestion" to pollQuestion,
                 "pollOptions" to pollOptionsList.joinToString("|"),
-                "pollVotes" to List(pollOptionsList.size) { "0" }.joinToString(",")
+                "pollVotes" to List(pollOptionsList.size) { "0" }.joinToString(","),
+                "channel" to _activeChannel.value,
+                "isGhost" to isGhost,
+                "expiresAt" to if (isGhost) System.currentTimeMillis() + 3600000L else 0L
             )
             try {
                 firestore.collection("posts").add(postMap).await()
@@ -510,13 +557,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFirebaseSync() {
         viewModelScope.launch {
-            val nextState = !_firebaseSynced.value
-            _firebaseSynced.value = nextState
             _currentUser.value?.let { user ->
-                val updated = user.copy(firebaseSynced = nextState)
+                val updated = user.copy(firebaseSynced = !user.firebaseSynced)
                 clanDao.updateUser(updated)
                 _currentUser.value = updated
             }
+        }
+    }
+
+    fun updateUserProfile(newBio: String, newPin: String) {
+        viewModelScope.launch {
+            _currentUser.value?.let { user ->
+                val updated = user.copy(bio = newBio, tacticalPin = newPin)
+                clanDao.updateUser(updated)
+                _currentUser.value = updated
+                try {
+                    val uid = auth.currentUser?.uid
+                    if (uid != null) {
+                        firestore.collection("users").document(uid).update(
+                            "bio", newBio,
+                            "tacticalPin", newPin
+                        ).await()
+                    }
+                } catch (e: Exception) { }
+            }
+        }
+    }
+
+    fun fetchAdminUserList() {
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("users").get().await()
+                val users = snapshot.documents.mapNotNull { doc ->
+                    UserEntity(
+                        username = doc.getString("username") ?: "unknown",
+                        email = doc.getString("email") ?: "",
+                        bio = doc.getString("bio") ?: "",
+                        role = doc.getString("role") ?: "OPERATIVO",
+                        tacticalPin = doc.getString("tacticalPin") ?: ""
+                    )
+                }
+                _adminUsersList.value = users
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun adminChangeUserRole(targetUsername: String, newRole: String) {
+        viewModelScope.launch {
+            try {
+                val snap = firestore.collection("users").whereEqualTo("username", targetUsername).get().await()
+                for (doc in snap.documents) {
+                    doc.reference.update("role", newRole).await()
+                }
+                fetchAdminUserList() // refresh
+            } catch (e: Exception) { }
         }
     }
 
@@ -563,11 +657,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun performSimulatedPatchUpdate(onSuccess: () -> Unit) {
         viewModelScope.launch {
             _checkingForUpdates.value = true
-            kotlinx.coroutines.delay(2200)
-            _checkingForUpdates.value = false
-            _githubRelease.value = _githubRelease.value?.copy(canUpdate = false, version = "CLAN-V2.1.2-RED-STRIKE (ATTUALE)")
-            triggerSimulatedNotification("AGGIORNAMENTO APPLICATO", "Kernel validato.", "SISTEMA")
-            onSuccess()
+            try {
+                @Suppress("BlockingMethodInNonBlockingContext")
+                val response = kotlinx.coroutines.Dispatchers.IO.invoke {
+                    val url = java.net.URL("https://api.github.com/repos/${repoOwner.value}/${repoName.value}/releases/latest")
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                    if (connection.responseCode == 200) {
+                        connection.inputStream.bufferedReader().readText()
+                    } else null
+                }
+                
+                _checkingForUpdates.value = false
+                if (response != null) {
+                    val versionRegex = "\"tag_name\":\\s*\"([^\"]+)\"".toRegex()
+                    val match = versionRegex.find(response)
+                    val v = match?.groupValues?.get(1) ?: "SCONOSCIUTA"
+                    
+                    _githubRelease.value = _githubRelease.value?.copy(canUpdate = false, version = "CLAN $v (ATTUALE)") ?: GitHubRelease("CLAN $v (ATTUALE)", "Oggi", emptyList(), 10.0, false)
+                    triggerSimulatedNotification("AGGIORNAMENTO APPLICATO", "Kernel GitHub validato alla versione $v.", "SISTEMA")
+                    onSuccess()
+                } else {
+                    triggerSimulatedNotification("ERRORE AGGIORNAMENTO", "Reticolo GitHub irraggiungibile.", "ALLERTA")
+                }
+            } catch (e: Exception) {
+                _checkingForUpdates.value = false
+                triggerSimulatedNotification("ERRORE SCRIPT", e.message ?: "Network error", "ALLERTA")
+            }
         }
     }
 
@@ -584,14 +701,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeBackupById(id: String) { viewModelScope.launch { clanDao.deleteBackup(id) } }
 
-    fun attemptRegisterCredentials(user: String, mail: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        if (user.isBlank() || mail.isBlank() || pass.isBlank()) { onError("Dati incompleti!"); return }
+    fun attemptRegisterCredentials(user: String, mail: String, pass: String, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (user.isBlank() || mail.isBlank() || pass.isBlank() || pin.isBlank()) { onError("Dati incompleti!"); return }
         viewModelScope.launch {
             try {
                 val res = auth.createUserWithEmailAndPassword(mail, pass).await()
                 val uid = res.user?.uid ?: throw Exception("UID Error")
-                val newUser = UserEntity(username = user, email = mail, followersCount = 0, followingCount = 0)
-                val userMap = hashMapOf("username" to user, "email" to mail, "bio" to newUser.bio, "followersCount" to 0, "followingCount" to 0)
+                val newUser = UserEntity(username = user, email = mail, followersCount = 0, followingCount = 0, role = "OPERATIVO", tacticalPin = pin)
+                val userMap = hashMapOf("username" to user, "email" to mail, "bio" to newUser.bio, "followersCount" to 0, "followingCount" to 0, "role" to "OPERATIVO", "tacticalPin" to pin)
                 firestore.collection("users").document(uid).set(userMap).await()
                 clanDao.insertUser(newUser)
                 _currentUser.value = newUser
@@ -600,13 +717,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun attemptLoginCredentials(mail: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun attemptLoginCredentials(mail: String, pass: String, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
                 val res = auth.signInWithEmailAndPassword(mail, pass).await()
                 val doc = firestore.collection("users").document(res.user?.uid ?: "").get().await()
                 if (doc.exists()) {
-                    val u = UserEntity(username = doc.getString("username") ?: "", email = mail, bio = doc.getString("bio") ?: "", followersCount = doc.getLong("followersCount")?.toInt() ?: 0, followingCount = doc.getLong("followingCount")?.toInt() ?: 0)
+                    val savedPin = doc.getString("tacticalPin") ?: ""
+                    if (savedPin != pin) {
+                        auth.signOut()
+                        onError("PIN TATTICO ERRATO")
+                        return@launch
+                    }
+                    val u = UserEntity(username = doc.getString("username") ?: "", email = mail, bio = doc.getString("bio") ?: "", followersCount = doc.getLong("followersCount")?.toInt() ?: 0, followingCount = doc.getLong("followingCount")?.toInt() ?: 0, role = doc.getString("role") ?: "OPERATIVO", tacticalPin = savedPin)
                     clanDao.insertUser(u)
                     _currentUser.value = u
                     onSuccess()

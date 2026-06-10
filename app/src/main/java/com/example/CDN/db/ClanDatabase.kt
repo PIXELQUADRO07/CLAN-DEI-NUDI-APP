@@ -16,7 +16,9 @@ data class UserEntity(
     val followingCount: Int = 89,
     val biometricEnabled: Boolean = false,
     val firebaseSynced: Boolean = true,
-    val passwordHash: String = "clan_pass_123"
+    val passwordHash: String = "clan_pass_123",
+    val role: String = "OPERATIVO",
+    val tacticalPin: String = ""
 )
 
 // Textual feeds & Polls (Instagram style)
@@ -33,7 +35,10 @@ data class PostEntity(
     val isPoll: Boolean = false,
     val pollQuestion: String = "",
     val pollOptions: String = "", // Pipes-separated options: e.g. "REALE|CYBERPUNK"
-    val pollVotes: String = "" // Comma-separated votes counters: e.g. "12,24"
+    val pollVotes: String = "", // Comma-separated votes counters: e.g. "12,24"
+    val channel: String = "generale",
+    val isGhost: Boolean = false,
+    val expiresAt: Long = 0L
 )
 
 // Encrypted message model
@@ -46,7 +51,9 @@ data class MessageEntity(
     val encryptedBody: String, // Encrypted hex/base64 string
     val originalDecryptKey: String, // Simulates E2E dynamic crypto key
     val timestamp: Long = System.currentTimeMillis(),
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val isGhost: Boolean = false,
+    val expiresAt: Long = 0L
 )
 
 // Backup logs
@@ -79,6 +86,9 @@ interface ClanDao {
     suspend fun deleteUser(username: String)
 
     // Posts & Polls queries (Flow for live streams)
+    @Query("SELECT * FROM posts WHERE channel = :channel ORDER BY timestamp DESC")
+    fun getPostsByChannelFlow(channel: String): Flow<List<PostEntity>>
+
     @Query("SELECT * FROM posts ORDER BY timestamp DESC")
     fun getAllPostsFlow(): Flow<List<PostEntity>>
 
@@ -116,7 +126,7 @@ interface ClanDao {
 
 @Database(
     entities = [UserEntity::class, PostEntity::class, MessageEntity::class, BackupEntity::class],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class ClanDatabase : RoomDatabase() {
