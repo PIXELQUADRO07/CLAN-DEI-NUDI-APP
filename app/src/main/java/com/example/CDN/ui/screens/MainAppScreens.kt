@@ -1752,3 +1752,4 @@ fun SettingsScreen(
         }
     }
 }
+}

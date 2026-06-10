@@ -31,7 +31,14 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.example.CDN.ui.components.*
-import com.example.CDN.ui.screens.*
+import com.example.CDN.ui.screens.FeedScreen
+import com.example.CDN.ui.screens.ProfileScreen
+import com.example.CDN.ui.screens.SurveysScreen
+import com.example.CDN.ui.screens.EncryptedChatScreen
+import com.example.CDN.ui.screens.RadarScreen
+import com.example.CDN.ui.screens.SettingsScreen
+import com.example.CDN.ui.screens.AuthScreen
+import com.example.CDN.ui.screens.ShellScreen
 import com.example.CDN.ui.theme.MyApplicationTheme
 import com.example.CDN.viewmodel.MainViewModel
 
