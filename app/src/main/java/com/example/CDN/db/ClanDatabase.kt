@@ -143,7 +143,7 @@ abstract class ClanDatabase : RoomDatabase() {
                     ClanDatabase::class.java,
                     "clan_dei_nudi_database"
                 )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
                 INSTANCE = instance
                 instance

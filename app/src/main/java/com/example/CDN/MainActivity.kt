@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -198,7 +199,7 @@ class MainActivity : FragmentActivity() {
                       Triple("feed", Icons.Default.Home, viewModel.translate("tab_feed", "Bacheca")),
                       Triple("map", Icons.Default.Radar, viewModel.translate("tab_radar", "Radar GPS")),
                       Triple("surveys", Icons.Default.Poll, viewModel.translate("tab_surveys", "Sondaggi")),
-                      Triple("messages", Icons.Default.Chat, viewModel.translate("tab_chat", "Chat Criptate")),
+                      Triple("messages", Icons.AutoMirrored.Filled.Chat, viewModel.translate("tab_chat", "Chat Criptate")),
                       Triple("shell", Icons.Default.Terminal, viewModel.translate("tab_shell", "Shell UNIX")),
                       Triple("settings", Icons.Default.Settings, viewModel.translate("tab_settings", "Config"))
                     )
