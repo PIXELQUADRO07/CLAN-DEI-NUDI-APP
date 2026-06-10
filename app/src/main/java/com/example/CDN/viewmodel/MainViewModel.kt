@@ -718,19 +718,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun attemptLoginCredentials(mail: String, pass: String, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun attemptLoginCredentials(mail: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
                 val res = auth.signInWithEmailAndPassword(mail, pass).await()
                 val doc = firestore.collection("users").document(res.user?.uid ?: "").get().await()
                 if (doc.exists()) {
-                    val savedPin = doc.getString("tacticalPin") ?: ""
-                    if (savedPin != pin) {
-                        auth.signOut()
-                        onError("PIN TATTICO ERRATO")
-                        return@launch
-                    }
-                    val u = UserEntity(username = doc.getString("username") ?: "", email = mail, bio = doc.getString("bio") ?: "", followersCount = doc.getLong("followersCount")?.toInt() ?: 0, followingCount = doc.getLong("followingCount")?.toInt() ?: 0, role = doc.getString("role") ?: "OPERATIVO", tacticalPin = savedPin)
+                    val u = UserEntity(
+                        username = doc.getString("username") ?: "",
+                        email = mail,
+                        bio = doc.getString("bio") ?: "",
+                        followersCount = doc.getLong("followersCount")?.toInt() ?: 0,
+                        followingCount = doc.getLong("followingCount")?.toInt() ?: 0,
+                        role = doc.getString("role") ?: "OPERATIVO",
+                        tacticalPin = doc.getString("tacticalPin") ?: ""
+                    )
                     clanDao.insertUser(u)
                     _currentUser.value = u
                     onSuccess()
