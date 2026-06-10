@@ -748,7 +748,7 @@ fun EncryptedChatScreen(
                 ) {
                     items(messages) { message ->
                         val isMe = message.sender == currentUser?.username
-                        val decrypted = com.example.CDN.utils.SecurityUtils.decryptAES(message.encryptedBody, cryptoKeyInput)
+                        val decrypted = com.example.CDN.security.SecurityUtils.decryptAES(message.encryptedBody, cryptoKeyInput)
 
                         val displayColor = if (isMe) CyberRed else CyberGray
                         val alignSide = if (isMe) Alignment.End else Alignment.Start
@@ -869,19 +869,17 @@ fun EncryptedChatScreen(
                             rawText = ""
                         }
                     },
-                    }
-                },
-                modifier = Modifier
-                    .size(50.dp)
-                    .background(CyberRed, RoundedCornerShape(10.dp))
-                    .testTag("send_msg_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send Encrypted Message Toggle",
-                    tint = CyberWhite
-                )
-            }
+                    modifier = Modifier
+                        .size(50.dp)
+                        .background(CyberRed, RoundedCornerShape(10.dp))
+                        .testTag("send_msg_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send Encrypted Message Toggle",
+                        tint = CyberWhite
+                    )
+                }
         }
     }
 }

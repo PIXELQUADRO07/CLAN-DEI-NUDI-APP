@@ -20,6 +20,7 @@ import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 // Nearby member on Radar Map
@@ -659,7 +660,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _checkingForUpdates.value = true
             try {
                 @Suppress("BlockingMethodInNonBlockingContext")
-                val response = kotlinx.coroutines.Dispatchers.IO.invoke {
+                val response = withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val url = java.net.URL("https://api.github.com/repos/${repoOwner.value}/${repoName.value}/releases/latest")
                     val connection = url.openConnection() as java.net.HttpURLConnection
                     connection.requestMethod = "GET"
@@ -672,7 +673,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _checkingForUpdates.value = false
                 if (response != null) {
                     val versionRegex = "\"tag_name\":\\s*\"([^\"]+)\"".toRegex()
-                    val match = versionRegex.find(response)
+                    val match = versionRegex.find(response as CharSequence)
                     val v = match?.groupValues?.get(1) ?: "SCONOSCIUTA"
                     
                     _githubRelease.value = _githubRelease.value?.copy(canUpdate = false, version = "CLAN $v (ATTUALE)") ?: GitHubRelease("CLAN $v (ATTUALE)", "Oggi", emptyList(), 10.0, false)
