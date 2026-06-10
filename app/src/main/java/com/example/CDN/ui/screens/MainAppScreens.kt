@@ -880,6 +880,7 @@ fun EncryptedChatScreen(
                         tint = CyberWhite
                     )
                 }
+            }
         }
     }
 }
